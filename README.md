@@ -7,7 +7,7 @@ This script checks for common mistakes in LaTeX source files of scientific paper
 Install directly from this repository:
 
 ```bash
-pip install paperlinter@git+https://github.com/misc0110/Paper-Linter
+pip install paperlinter@git+https://github.com/vdmitriyev/Paper-Linter
 ```
 
 ## Usage: CLI
@@ -290,6 +290,10 @@ This category includes warnings for everything related to (cross-)references (sw
 #### Duplicate Keys in Citations
 * **Description**: Warns if a `cite` command has duplicate entries
 * **Switch**: `cite-duplicate`
+
+#### Empty Citation Key
+* **Description**: Warns if a `cite` command is empty, i.e., has no key
+* **Switch**: `cite-empty`
 
 ## License
 

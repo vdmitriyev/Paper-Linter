@@ -15,8 +15,19 @@ PROG_NAME = "paperlinter"
 
 def usage():
     print(
-        f"{PROG_NAME} <file.tex/path> [-x <excluded-switch1>] [-i <included-switch1>] [-i/x <switch n, evaluated in order of specification>] [--error]"
+        f"{PROG_NAME} \033[94m<file.tex/path>\033[0m [-x <excluded-switch1>] [-i <included-switch1>] [-i/x <switch n, evaluated in order of specification>] [--error]"
     )
+
+    print(f"{PROG_NAME} \033[94m--help\033[0m")
+    print(f"{PROG_NAME} \033[94m--list\033[0m")
+
+
+def usage_list_checks():
+    print("List of checks for TeX available:")
+    list_to_print = [item[2] for item in checks]
+    list_to_print.sort()
+    for item in list_to_print:
+        print(f"\033[94m {item}\033[0m")
 
 
 def get_tex_files():
@@ -491,7 +502,7 @@ def check_multiple_sentences_per_line():
     warns = []
     for i, l in enumerate(tex_lines_clean):
         p = re.search("[\\.!?]\\s+\\w+", l.rstrip())
-        if p:
+        if p and "vs." not in l.rstrip():
             warns.append((i, "Multiple sentences in one line", p.span()))
     return warns
 
@@ -784,6 +795,15 @@ def check_multicite():
                     cites.span(),
                 )
             )
+    return warns
+
+
+def check_emptycite():
+    warns = []
+    for i, l in enumerate(tex_lines):
+        cites = re.search("\\\\citeA?\\{\\s*\\}", l)
+        if cites:
+            warns.append((i, "Empty citation key", cites.span()))
     return warns
 
 
@@ -1123,6 +1143,7 @@ checks = [
     (check_acronym_capitalization, CATEGORY_TYPOGRAPHY, "acronym-capitalization"),
     (check_numeral, CATEGORY_GENERAL, "numeral"),
     (check_multicite, CATEGORY_STYLE, "multiple-cites"),
+    (check_emptycite, CATEGORY_REFERENCE, "cite-empty"),
     (check_colors, CATEGORY_VISUAL, "colors"),
     (check_inconsistent_word_style, CATEGORY_TYPOGRAPHY, "inconsistent-textstyle"),
     (check_missing_word_style, CATEGORY_TYPOGRAPHY, "missing-textstyle"),
@@ -1154,7 +1175,7 @@ def add_categories(cat, new_cat):
     if type(new_cat) is str:
         full_cat = [x[0] for x in category_switches]
         if new_cat in full_cat:
-            # full category, add everythingt that is not already there
+            # full category, add everything that is not already there
             idx = full_cat.index(new_cat)
             new_cat = category_switches[idx][1]
         else:
@@ -1169,7 +1190,7 @@ def remove_categories(cat, rem_cat):
     if type(rem_cat) is str:
         full_cat = [x[0] for x in category_switches]
         if rem_cat in full_cat:
-            # full category, add everythingt that is not already there
+            # full category, add everything that is not already there
             idx = full_cat.index(rem_cat)
             rem_cat = category_switches[idx][1]
         else:
@@ -1214,14 +1235,22 @@ def main():
         usage()
         sys.exit(1)
 
+    args_lower = [arg.lower() for arg in sys.argv]
+
+    if "--help" in args_lower:
+        usage()
+        sys.exit(1)
+
+    if "--list" in args_lower:
+        usage_list_checks()
+        sys.exit(1)
+
     tex_files = get_tex_files()
 
-    nr_warnings = 0
-    nr_suppressed = 0
+    nr_warnings, nr_suppressed = 0, 0
 
     idx = 1
-    has_rules = False
-    exit_code = False
+    has_rules, exit_code = False, False
 
     # -x to exclude, -i to include
     used_categories = set()
@@ -1262,28 +1291,33 @@ def main():
     if not has_rules:
         add_categories(used_categories, "all")
 
-    for file in tex_files:
-        next_file(file)
-        print("Inspecting file \033[94m'%s'\033[0m" % file)
+    if tex_files is not None:
+        for file in tex_files:
+            next_file(file)
+            print("Inspecting file \033[94m'%s'\033[0m" % file)
 
-        preprocess()
+            preprocess()
 
-        warnings = []
-        suppressed = []
-        for c in checks:
-            add_warn = c[0]()
-            if c[2] in used_categories:
-                warnings += [(x, c[2]) for x in add_warn]
-            else:
-                suppressed += [(x, c[2]) for x in add_warn]
+            warnings = []
+            suppressed = []
+            for c in checks:
+                add_warn = c[0]()
+                if c[2] in used_categories:
+                    warnings += [(x, c[2]) for x in add_warn]
+                else:
+                    suppressed += [(x, c[2]) for x in add_warn]
 
-        nr_warnings += print_warnings(warnings)
-        nr_suppressed += print_warnings(suppressed, output=False)
+            nr_warnings += print_warnings(warnings)
+            nr_suppressed += print_warnings(suppressed, output=False)
 
-    print("")
-    print("%d warnings printed; %d suppressed warnings" % (nr_warnings, nr_suppressed))
-    if exit_code:
-        sys.exit(1 if nr_warnings > 0 else 0)
+        print("")
+        print(
+            "%d warnings printed; %d suppressed warnings" % (nr_warnings, nr_suppressed)
+        )
+        if exit_code:
+            sys.exit(1 if nr_warnings > 0 else 0)
+    else:
+        print("No .tex files were found")
 
 
 if __name__ == "__main__":
